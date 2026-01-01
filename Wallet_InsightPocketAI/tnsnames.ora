@@ -1,0 +1,12 @@
+insightpocketai_high = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-chuncheon-1.oraclecloud.com))(connect_data=(service_name=gf445053d77fc8c_insightpocketai_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+insightpocketai_medium = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-chuncheon-1.oraclecloud.com))(connect_data=(service_name=gf445053d77fc8c_insightpocketai_medium.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+insightpocketai_low = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-chuncheon-1.oraclecloud.com))(connect_data=(service_name=gf445053d77fc8c_insightpocketai_low.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+insightpocketai_tp = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-chuncheon-1.oraclecloud.com))(connect_data=(service_name=gf445053d77fc8c_insightpocketai_tp.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+insightpocketai_tpurgent = (description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-chuncheon-1.oraclecloud.com))(connect_data=(service_name=gf445053d77fc8c_insightpocketai_tpurgent.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))
+
+
+
