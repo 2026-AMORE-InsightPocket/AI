@@ -6,8 +6,8 @@ from datetime import date
 import uuid
 import re
 
+import oracledb
 from langchain_openai import OpenAIEmbeddings
-
 import settings
 
 
@@ -20,22 +20,6 @@ def _lob_to_str(x: Any) -> str:
         except Exception:
             return str(x)
     return str(x)
-
-
-def load_rule_doc_body(conn, doc_id: str) -> str:
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT body_md
-        FROM rag_docs
-        WHERE doc_id = :doc_id
-        """,
-        {"doc_id": doc_id},
-    )
-    row = cur.fetchone()
-    if not row:
-        raise RuntimeError(f"RULE_DOC not found: {doc_id}")
-    return _lob_to_str(row[0])
 
 
 # -------------------------
@@ -88,16 +72,10 @@ def upsert_report_doc(
 # 2) chunking
 # -------------------------
 def _simple_md_chunk(md: str, max_chars: int = 1200, overlap: int = 120) -> List[str]:
-    """
-    아주 단순한 chunker (MVP)
-    - Markdown을 문단 단위로 쪼개되, 너무 길면 max_chars 기준으로 split
-    - overlap은 RAG 품질을 위한 약간의 겹침
-    """
     md = (md or "").strip()
     if not md:
         return []
 
-    # 큰 구분 먼저: 빈 줄 2개 이상 기준
     paras = re.split(r"\n{2,}", md)
     chunks: List[str] = []
     buf = ""
@@ -113,21 +91,17 @@ def _simple_md_chunk(md: str, max_chars: int = 1200, overlap: int = 120) -> List
         if not p:
             continue
 
-        # buf에 붙였을 때 너무 커지면 flush
         if len(buf) + len(p) + 2 > max_chars:
             flush_buf()
-            # p 자체가 너무 길면 강제로 잘라서 넣기
             while len(p) > max_chars:
                 part = p[:max_chars]
                 chunks.append(part.strip())
-                p = p[max_chars - overlap :]  # overlap 유지
+                p = p[max_chars - overlap :]
             buf = p
         else:
             buf = (buf + "\n\n" + p).strip() if buf else p
 
     flush_buf()
-
-    # overlap 처리(문단 기반이라 이미 약간 자연스럽지만, 여기선 추가 처리 안 함)
     return chunks
 
 
@@ -146,10 +120,14 @@ def insert_chunks_with_embeddings(
     doc_id: str,
     chunks: List[str],
     embedding_model: str = "text-embedding-3-small",
+    use_safe_insert: bool = True,   # ⭐ executemany가 계속 터지면 True 유지 추천
 ) -> int:
     """
     rag_doc_chunks에 chunk + embedding 저장
-    - embedding VECTOR(1536) 컬럼에 list[float]로 넣는 방식(드라이버/DB 지원 전제)
+
+    주의:
+    - vec(List[float]) executemany 바인딩이 ORA-01484를 유발할 수 있음
+    - 가장 안전한 방식: embedding 포함 insert는 loop execute (use_safe_insert=True)
     """
     if not chunks:
         return 0
@@ -159,22 +137,35 @@ def insert_chunks_with_embeddings(
 
     cur = conn.cursor()
 
+    # embedding 바인드를 VECTOR로 명시
+    try:
+        cur.setinputsizes(None, None, None, None, None, oracledb.DB_TYPE_VECTOR)
+    except Exception:
+        pass
+
+    sql = """
+    INSERT INTO rag_doc_chunks (
+      chunk_id, doc_id, chunk_index, content, token_count, embedding, created_at
+    ) VALUES (
+      :1, :2, :3, :4, :5, :6, SYSTIMESTAMP
+    )
+    """
+
     rows: List[Tuple[Any, ...]] = []
     for idx, (text, vec) in enumerate(zip(chunks, vectors)):
-        chunk_id = uuid.uuid4().hex  # VARCHAR2(64) 충분
-        token_count = None  # 필요하면 추후 계산
+        chunk_id = uuid.uuid4().hex
+        token_count = None
         rows.append((chunk_id, doc_id, idx, text, token_count, vec))
 
-    cur.executemany(
-        """
-        INSERT INTO rag_doc_chunks (
-          chunk_id, doc_id, chunk_index, content, token_count, embedding, created_at
-        ) VALUES (
-          :1, :2, :3, :4, :5, :6, SYSTIMESTAMP
-        )
-        """,
-        rows,
-    )
+    # ✅ 안전모드(추천): 개별 execute
+    if use_safe_insert:
+        for r in rows:
+            cur.execute(sql, r)
+        conn.commit()
+        return len(rows)
+
+    # 성능모드: executemany (여기서 ORA-01484 터질 수 있음)
+    cur.executemany(sql, rows)
     conn.commit()
     return len(rows)
 
@@ -188,9 +179,6 @@ def ingest_doc_to_rag(
     chunk_overlap: int = 120,
     embedding_model: str = "text-embedding-3-small",
 ) -> Dict[str, Any]:
-    """
-    doc 본문을 chunk로 나누고, 기존 chunks 삭제 후 새로 삽입
-    """
     chunks = _simple_md_chunk(body_md, max_chars=chunk_max_chars, overlap=chunk_overlap)
     delete_chunks_for_doc(conn, doc_id)
     n = insert_chunks_with_embeddings(
@@ -198,5 +186,6 @@ def ingest_doc_to_rag(
         doc_id=doc_id,
         chunks=chunks,
         embedding_model=embedding_model,
+        use_safe_insert=True,  # ⭐ 일단 안정적으로 가자
     )
     return {"doc_id": doc_id, "chunk_count": n}

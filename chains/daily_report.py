@@ -733,7 +733,6 @@ def save_daily_report(report_day: date, body_md: str, target_hour_kst: int) -> D
             conn.close()
         except Exception:
             pass
-
 # =========================
 # Main entry
 # =========================
@@ -780,13 +779,17 @@ def run_daily_report(
             one_line_insight=one_line,
         )
 
-        doc_id = None
+        saved = None
         if save:
-            doc_id = save_daily_report(report_day, final_md, target_hour_kst)
+            saved = save_daily_report(report_day, final_md, target_hour_kst)
+
+        doc_id = saved["doc_id"] if saved else None
+        chunk_count = saved["chunk_count"] if saved else 0
 
         return {
             "ok": True,
             "doc_id": doc_id,
+            "chunk_count": chunk_count,
             "report_date": report_day.isoformat(),
             "target_hour_kst": target_hour_kst,
             "rule_doc_id": rule.get("doc_id"),

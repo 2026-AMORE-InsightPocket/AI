@@ -8,6 +8,7 @@ def main():
     print("error:", result.get("error"))
     print("doc_id:", result.get("doc_id"))
     print("report_date:", result.get("report_date"))
+    print("chunk_count:", result.get("chunk_count"))
     print("rule_doc_id:", result.get("rule_doc_id"))
     print("review_included:", result.get("review_included"))
     print("review_reasons:", result.get("review_reasons"))

@@ -120,4 +120,5 @@ fabric.properties
 ./Wallet_InsighgtPocketAI
 ./ssh-key-2025-12-26.key
 ./ssh-key-2025-12-26.key.pub
-
+__pycache__/
+*.pyc

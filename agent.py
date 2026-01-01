@@ -1,3 +1,5 @@
+#RAG 검색, 툴콜 기반 채팅
+
 from typing import List
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
