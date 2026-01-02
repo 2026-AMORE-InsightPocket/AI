@@ -29,12 +29,21 @@ jobs:
             git checkout main
             git pull origin main
 
-            # 1) python3 존재 확인
+            # 1) python 확인
             python3 --version
 
-            # 2) 의존성 설치 (venv 없이 유저 영역에 설치)
-            python3 -m pip install --user -U pip
-            python3 -m pip install --user -r requirements.txt
+            # 2) venv 만들 수 있게 패키지 설치(서버 1회 세팅 성격, 있어도 안전)
+            sudo apt-get update -y
+            sudo apt-get install -y python3-venv python3-pip
 
-            # 3) 실행
-            python3 generate_daily_report.py
+            # 3) venv 생성(없으면 만들고, 있으면 재사용)
+            if [ ! -d ".venv" ]; then
+              python3 -m venv .venv
+            fi
+
+            # 4) venv의 pip로만 설치 (activate에 의존하지 않음)
+            ./.venv/bin/python -m pip install -U pip
+            ./.venv/bin/pip install -r requirements.txt
+
+            # 5) venv python으로 실행
+            ./.venv/bin/python generate_daily_report.py
