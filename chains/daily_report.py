@@ -704,7 +704,7 @@ def save_daily_report(report_day: date, body_md: str, target_hour_kst: int) -> D
     conn = get_oracle_conn()
     try:
         doc_id = doc_id_for_daily(report_day)
-        title = f"Daily Report {report_day.isoformat()} (KST {target_hour_kst}:00 기준)"
+        title = f"{report_day.year}년 {report_day.month}월 {report_day.day}일 리포트"
 
         # 1) rag_docs 저장(업서트)
         upsert_report_doc(
