@@ -59,7 +59,6 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     selectedDataIds: Optional[List[str]] = None
     selectedDataTitles: Optional[List[str]] = None
-    contextValue: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -109,17 +108,6 @@ def build_system_prompt() -> str:
 def to_lc_messages(req: ChatRequest):
     """프론트에서 온 messages를 LangChain 메시지로 변환 + 첨부 데이터(선택된 데이터) 포함"""
     out = [SystemMessage(content=build_system_prompt())]
-    # ✅ [추가] 프론트에서 넘어온 contextValue를 시스템 컨텍스트로 주입
-    if req.contextValue:
-        out.append(
-            SystemMessage(
-                content=f"""
-    [현재 대화 컨텍스트]
-    {req.contextValue}
-    """.strip()
-            )
-        )
-
     # 선택된 데이터(모달에서 고른 것) → 마지막 user 입력에 컨텍스트로 붙이기
     selected_block = ""
     if req.selectedDataTitles:
@@ -168,12 +156,6 @@ def chat(req: ChatRequest):
             ensure_ascii=False,
         ),
     )
-    #  [추가] 프론트에서 넘어온 contextValue 로그
-    if req.contextValue:
-        logger.info(
-            "[CHAT][CONTEXT] %s",
-            _safe_preview(req.contextValue, 800)
-        )
 
     # 기존 코드
     messages = to_lc_messages(req)
