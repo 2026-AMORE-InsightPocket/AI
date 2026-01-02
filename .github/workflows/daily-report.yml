@@ -27,25 +27,22 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+
+      # ✅ 바로 여기!!!
+      - name: Debug paths
+        run: |
+          pwd
+          ls -al
+          find . -maxdepth 3 -type f -name "generate_daily_report.py" -print
+          find . -maxdepth 2 -type d -print
 
       - name: Run daily report
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
           ORACLE_PASSWORD: ${{ secrets.ORACLE_PASSWORD }}
-          ORACLE_DSN: ${{ secrets.ORACLE_DSN }}
+          ORACLE_TLS_DSN: ${{ secrets.ORACLE_TLS_DSN }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           LLM_TEMPERATURE: ${{ secrets.LLM_TEMPERATURE }}
         run: |
           python AiService/generate_daily_report.py
-
-      - name: Upload log (optional)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-report-log
-          path: |
-            **/*.log
-            **/logs/**
-          if-no-files-found: ignore
