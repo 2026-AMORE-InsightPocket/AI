@@ -29,9 +29,16 @@ jobs:
             git checkout main
             git pull origin main
 
-            # (권장) venv 쓰면 활성화
-            if [ -f ".venv/bin/activate" ]; then
-              source .venv/bin/activate
-            fi
+            # 1) python3 존재 확인
+            python3 --version
 
+            # 2) venv 생성 + 활성화 (없으면 새로 만듦)
+            python3 -m venv .venv
+            source .venv/bin/activate
+
+            # 3) 의존성 설치
+            python -m pip install -U pip
+            pip install -r requirements.txt
+
+            # 4) 실행
             python generate_daily_report.py
