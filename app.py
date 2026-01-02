@@ -9,6 +9,20 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 import settings
+import logging
+import json
+
+logger = logging.getLogger("insightpocket")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+def _safe_preview(text: str, limit: int = 500) -> str:
+    if not text:
+        return ""
+    text = str(text)
+    return text if len(text) <= limit else text[:limit] + "...(truncated)"
 
 app = FastAPI(title="InsightPocket AI Service")
 
@@ -45,6 +59,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     selectedDataIds: Optional[List[str]] = None
     selectedDataTitles: Optional[List[str]] = None
+    contextValue: Optional[str] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -94,6 +109,16 @@ def build_system_prompt() -> str:
 def to_lc_messages(req: ChatRequest):
     """프론트에서 온 messages를 LangChain 메시지로 변환 + 첨부 데이터(선택된 데이터) 포함"""
     out = [SystemMessage(content=build_system_prompt())]
+    # ✅ [추가] 프론트에서 넘어온 contextValue를 시스템 컨텍스트로 주입
+    if req.contextValue:
+        out.append(
+            SystemMessage(
+                content=f"""
+    [현재 대화 컨텍스트]
+    {req.contextValue}
+    """.strip()
+            )
+        )
 
     # 선택된 데이터(모달에서 고른 것) → 마지막 user 입력에 컨텍스트로 붙이기
     selected_block = ""
@@ -128,13 +153,55 @@ def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    # ✅ 1. 프론트 → 서버로 들어온 원본 메시지 로그
+    logger.info(
+        "[CHAT][REQ] %s",
+        json.dumps(
+            [
+                {
+                    "role": m.role,
+                    "content": _safe_preview(m.content),
+                    "attachedData": m.attachedData,
+                }
+                for m in req.messages
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    #  [추가] 프론트에서 넘어온 contextValue 로그
+    if req.contextValue:
+        logger.info(
+            "[CHAT][CONTEXT] %s",
+            _safe_preview(req.contextValue, 800)
+        )
+
+    # 기존 코드
+    messages = to_lc_messages(req)
+
+    # ✅ 2. LLM에 실제로 전달되는 메시지 로그 (System 포함)
+    logger.info(
+        "[CHAT][LC_INPUT] %s",
+        json.dumps(
+            [
+                {
+                    "type": type(m).__name__,
+                    "content": _safe_preview(m.content),
+                }
+                for m in messages
+            ],
+            ensure_ascii=False,
+        ),
+    )
+
     llm = ChatOpenAI(
         model=settings.LLM_MODEL,
         temperature=settings.LLM_TEMPERATURE,
         api_key=settings.OPENAI_API_KEY,
     )
 
-    messages = to_lc_messages(req)
     resp = llm.invoke(messages)
+
+    # ✅ 3. LLM 응답 로그
+    logger.info("[CHAT][RESP] %s", _safe_preview(resp.content, 800))
 
     return {"answer": str(resp.content).strip()}
