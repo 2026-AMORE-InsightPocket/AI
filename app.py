@@ -21,8 +21,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://43.202.180.67",           # (선택) IP 접속
-        "http://43.202.180.67:80"        # (선택)
-        # 도메인 뜨면 https://boradora.store 추가하기
+        "http://43.202.180.67:80",
+        "https://boradora.store"
+
     ],
     allow_credentials=True,
     allow_methods=["*"],
