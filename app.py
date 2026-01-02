@@ -22,7 +22,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://43.202.180.67",           # (선택) IP 접속
         "http://43.202.180.67:80",
-        "https://boradora.store"
+        "https://boradora.store",
+        "https://insight-pocket.vercel.app/"
 
     ],
     allow_credentials=True,
