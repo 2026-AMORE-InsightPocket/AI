@@ -25,6 +25,8 @@ def _lob_to_str(x: Any) -> str:
 # -------------------------
 # 1) rag_docs 저장 (UPSERT)
 # -------------------------
+# rag_store.py
+
 def upsert_report_doc(
     conn,
     *,
@@ -34,27 +36,18 @@ def upsert_report_doc(
     body_md: str,
     report_date: Optional[date] = None,
 ) -> Dict[str, Any]:
-    """
-    rag_docs에 레포트 저장 (doc_id 기준 MERGE).
-    - daily는 doc_id를 날짜로 고정하는 게 보통: daily_YYYY-MM-DD
-    """
     cur = conn.cursor()
+
+    # 1) 먼저 UPDATE 시도
     cur.execute(
         """
-        MERGE INTO rag_docs t
-        USING (SELECT :doc_id AS doc_id FROM dual) s
-        ON (t.doc_id = s.doc_id)
-        WHEN MATCHED THEN UPDATE SET
-          t.doc_type_id = :doc_type_id,
-          t.title = :title,
-          t.body_md = :body_md,
-          t.report_date = :report_date,
-          t.created_at = CURRENT_TIMESTAMP
-        WHEN NOT MATCHED THEN INSERT (
-          doc_id, doc_type_id, title, body_md, report_date, created_at
-        ) VALUES (
-          :doc_id, :doc_type_id, :title, :body_md, :report_date, CURRENT_TIMESTAMP
-        )
+        UPDATE rag_docs
+           SET doc_type_id = :doc_type_id,
+               title       = :title,
+               body_md      = :body_md,
+               report_date  = :report_date,
+               created_at   = CURRENT_TIMESTAMP
+         WHERE doc_id = :doc_id
         """,
         {
             "doc_id": doc_id,
@@ -64,6 +57,23 @@ def upsert_report_doc(
             "report_date": report_date,
         },
     )
+
+    # 2) 없으면 INSERT
+    if cur.rowcount == 0:
+        cur.execute(
+            """
+            INSERT INTO rag_docs (doc_id, doc_type_id, title, body_md, report_date, created_at)
+            VALUES (:doc_id, :doc_type_id, :title, :body_md, :report_date, CURRENT_TIMESTAMP)
+            """,
+            {
+                "doc_id": doc_id,
+                "doc_type_id": doc_type_id,
+                "title": title,
+                "body_md": body_md,
+                "report_date": report_date,
+            },
+        )
+
     conn.commit()
     return {"doc_id": doc_id, "title": title}
 
