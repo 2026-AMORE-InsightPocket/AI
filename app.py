@@ -25,6 +25,7 @@ app.add_middleware(
         "https://boradora.store",
         "https://insight-pocket.vercel.app/"
 
+
     ],
     allow_credentials=True,
     allow_methods=["*"],
