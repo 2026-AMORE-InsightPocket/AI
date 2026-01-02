@@ -116,10 +116,10 @@ fabric.properties
 
 # End of https://www.toptal.com/developers/gitignore/api/pycharm
 
-./.env
-./Wallet_InsighgtPocketAI
-./ssh-key-2025-12-26.key
-./ssh-key-2025-12-26.key.pub
+*.env
+Wallet_InsighgtPocketAI
+ssh-key-2025-12-26.key
+ssh-key-2025-12-26.key.pub
 __pycache__/
 *.pyc
 .DS_Store
