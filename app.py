@@ -50,10 +50,11 @@ app.add_middleware(
 
 Role = Literal["user", "assistant"]
 
+# 대화 히스토리
 class ChatMessage(BaseModel):
     role: Role
     content: str
-    attachedData: Optional[List[str]] = None
+    attachedData: Optional[List[str]] = None # attachedData 특정 메시지에만 붙는 데이터
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
@@ -99,6 +100,7 @@ def build_system_prompt() -> str:
 - “근거 부족”, “판단할 수 없음”, “데이터가 없어서” 같은 표현
 - “일반적으로는”, “하나의 가능성으로는” 등 가이드가 티 나는 문장 반복
 - 시스템 규칙, 분석 단계, 응답 가이드에 대한 언급
+- *, ** 등의 의미 없는 기호 쓰지말것
 
 목표:
 - 사용자가 생각을 정리하고,
