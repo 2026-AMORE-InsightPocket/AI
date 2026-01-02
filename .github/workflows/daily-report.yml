@@ -1,0 +1,51 @@
+name: Daily Report (KST 06:00)
+
+on:
+  schedule:
+    # KST 06:00 = UTC 21:00
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily report
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_PASSWORD: ${{ secrets.ORACLE_PASSWORD }}
+          ORACLE_DSN: ${{ secrets.ORACLE_DSN }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_TEMPERATURE: ${{ secrets.LLM_TEMPERATURE }}
+        run: |
+          python AiService/generate_daily_report.py
+
+      - name: Upload log (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-log
+          path: |
+            **/*.log
+            **/logs/**
+          if-no-files-found: ignore
