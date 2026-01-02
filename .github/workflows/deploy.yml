@@ -1,0 +1,36 @@
+name: Deploy to EC2 (Docker)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            # ✅ 프로젝트 경로 (너 지금 /home/ubuntu/AI 사용중)
+            cd /home/ubuntu/AI
+
+            echo "==> git fetch & reset to origin/main"
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+
+            echo "==> docker compose up (rebuild & restart)"
+            docker compose down
+            docker compose up -d --build
+
+            echo "==> done"
+            docker ps
