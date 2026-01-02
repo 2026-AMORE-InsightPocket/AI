@@ -49,11 +49,11 @@ def upsert_report_doc(
           t.title = :title,
           t.body_md = :body_md,
           t.report_date = :report_date,
-          t.created_at = SYSTIMESTAMP
+          t.created_at = CURRENT_TIMESTAMP
         WHEN NOT MATCHED THEN INSERT (
           doc_id, doc_type_id, title, body_md, report_date, created_at
         ) VALUES (
-          :doc_id, :doc_type_id, :title, :body_md, :report_date, SYSTIMESTAMP
+          :doc_id, :doc_type_id, :title, :body_md, :report_date, CURRENT_TIMESTAMP
         )
         """,
         {
@@ -147,7 +147,7 @@ def insert_chunks_with_embeddings(
     INSERT INTO rag_doc_chunks (
       chunk_id, doc_id, chunk_index, content, token_count, embedding, created_at
     ) VALUES (
-      :1, :2, :3, :4, :5, :6, SYSTIMESTAMP
+      :1, :2, :3, :4, :5, :6, CURRENT_TIMESTAMP
     )
     """
 
