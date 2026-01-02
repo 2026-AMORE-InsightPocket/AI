@@ -1,0 +1,54 @@
+name: Daily Report (KST 11:00)
+
+on:
+  schedule:
+    # KST 11:00 = UTC 02:00
+    - cron: "0 2 * * *"
+  workflow_dispatch: {} # 수동 실행 버튼도 열어둠
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily report
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # DB/Oracle 등 너 settings에서 쓰는 환경변수들 추가
+          # 예:
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_PASSWORD: ${{ secrets.ORACLE_PASSWORD }}
+          ORACLE_DSN: ${{ secrets.ORACLE_DSN }}
+          # 혹시 settings에서 LLM_MODEL 등도 env로 받으면:
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_TEMPERATURE: ${{ secrets.LLM_TEMPERATURE }}
+        run: |
+          python AiService/generate_daily_report.py
+
+      - name: Upload log (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-log
+          path: |
+            **/*.log
+            **/logs/**
+          if-no-files-found: ignore
