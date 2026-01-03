@@ -11,6 +11,25 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 import settings
 import logging
 import json
+from datetime import date
+
+from db import get_oracle_conn
+from rag_store import (
+    upsert_report_doc,
+    ingest_doc_to_rag,
+    get_latest_doc_body_by_type_id,
+    new_report_id,
+)
+from chains.custom_report import generate_custom_report_md, infer_title_from_md
+from rag_store import get_doc_body_by_id  # 추가 import
+
+#  이미 있다고 했으니 고정
+DOC_TYPE_REPORT_CUSTOM = 2
+
+#  RULE_CUSTOM_V1이 들어있는 doc_type_id (너희 DB에 맞춰 숫자만 바꿔)
+DOC_TYPE_RULE_CUSTOM_V1 = 0
+
+RULE_DOC_ID = "RULE_CUSTOM_V1"
 
 logger = logging.getLogger("insightpocket")
 logging.basicConfig(
@@ -62,6 +81,11 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+
+class GenerateReportResponse(BaseModel):
+    report_id: str
+    body_md: str
+    title: Optional[str] = None
 
 
 def build_system_prompt() -> str:
@@ -133,6 +157,12 @@ def to_lc_messages(req: ChatRequest):
 
     return out
 
+def keep_last_user_message(req: ChatRequest) -> ChatRequest:
+    users = [m for m in req.messages if m.role == "user"]
+    if not users:
+        return ChatRequest(messages=[])
+    return ChatRequest(messages=[users[-1]])
+
 
 @app.get("/health")
 def health():
@@ -198,3 +228,55 @@ def chat(req: ChatRequest):
     logger.info("[CHAT][RESP] %s", _safe_preview(resp.content, 800))
 
     return {"answer": str(resp.content).strip()}
+
+@app.post("/api/report/custom", response_model=GenerateReportResponse)
+def report_custom(req: ChatRequest):
+    conn = None
+    try:
+        # ✅ 여기서 최근 user 1개만 남김
+        req = keep_last_user_message(req)
+
+        # 1) LangChain message로 변환
+        lc_messages = to_lc_messages(req)
+
+        # system prompt 제거
+        if lc_messages and isinstance(lc_messages[0], SystemMessage):
+            lc_messages = lc_messages[1:]
+
+        conn = get_oracle_conn()
+
+        rule_md = get_doc_body_by_id(conn, RULE_DOC_ID)
+        logger.info("[REPORT_CUSTOM][RULE_DOC] doc_id=%s len=%s", RULE_DOC_ID, len(rule_md or ""))
+
+        body_md = generate_custom_report_md(
+            lc_messages=lc_messages,
+            rule_md=rule_md,
+        )
+        title = infer_title_from_md(body_md, fallback="Custom Report")
+
+        report_id = new_report_id("report_custom")
+
+        upsert_report_doc(
+            conn,
+            doc_id=report_id,
+            doc_type_id=DOC_TYPE_REPORT_CUSTOM,
+            title=title,
+            body_md=body_md,
+            report_date=date.today(),
+        )
+
+        ingest_doc_to_rag(
+            conn,
+            doc_id=report_id,
+            body_md=body_md,
+        )
+
+        return {
+            "report_id": report_id,
+            "body_md": body_md,
+            "title": title,
+        }
+
+    finally:
+        if conn:
+            conn.close()
