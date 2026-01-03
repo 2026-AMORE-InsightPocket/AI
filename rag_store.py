@@ -199,3 +199,33 @@ def ingest_doc_to_rag(
         use_safe_insert=True,  # ⭐ 일단 안정적으로 가자
     )
     return {"doc_id": doc_id, "chunk_count": n}
+
+def new_report_id(prefix: str = "report_custom") -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
+
+
+def get_latest_doc_body_by_type_id(conn, doc_type_id: int) -> str:
+    """
+    rag_docs에서 특정 doc_type_id의 최신 body_md 가져오기
+    """
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT body_md
+          FROM rag_docs
+         WHERE doc_type_id = :doc_type_id
+         ORDER BY created_at DESC
+        """,
+        {"doc_type_id": doc_type_id},
+    )
+    row = cur.fetchone()
+    return row[0] if row and row[0] else ""
+
+def get_doc_body_by_id(conn, doc_id: str) -> str:
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT body_md FROM rag_docs WHERE doc_id = :doc_id",
+        {"doc_id": doc_id},
+    )
+    row = cur.fetchone()
+    return _lob_to_str(row[0]) if row and row[0] else ""
