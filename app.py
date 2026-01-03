@@ -26,7 +26,6 @@ def _safe_preview(text: str, limit: int = 500) -> str:
 
 app = FastAPI(title="InsightPocket AI Service")
 
-#  로컬 프론트(보통 Vite=5173 / CRA=3000)에서 호출하려면 CORS 필요
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,38 +33,36 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://43.202.180.67",           # (선택) IP 접속
+        "http://43.202.180.67",
         "http://43.202.180.67:80",
         "https://boradora.store",
         "https://insight-pocket.vercel.app"
-
-
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----------- Request/Response Schemas -----------
-
 Role = Literal["user", "assistant"]
+
+# ✅ 카드(모달/선택 데이터) 구조
+class AttachedCard(BaseModel):
+    title: str
+    lines: List[str]
 
 # 대화 히스토리
 class ChatMessage(BaseModel):
     role: Role
     content: str
-    attachedData: Optional[List[str]] = None # attachedData 특정 메시지에만 붙는 데이터
+    attachedData: Optional[List[AttachedCard]] = None  # ✅ 카드 배열
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    selectedDataIds: Optional[List[str]] = None
-    selectedDataTitles: Optional[List[str]] = None
+    selectedDataIds: Optional[List[str]] = None  # ✅ DB 조회 필요할 때만
 
 class ChatResponse(BaseModel):
     answer: str
 
-
-# ----------- Helpers -----------
 
 def build_system_prompt() -> str:
     return """
@@ -107,25 +104,27 @@ def build_system_prompt() -> str:
   다음에 무엇을 하면 좋을지 자연스럽게 떠올릴 수 있도록 돕는다.
 """.strip()
 
-def to_lc_messages(req: ChatRequest):
-    """프론트에서 온 messages를 LangChain 메시지로 변환 + 첨부 데이터(선택된 데이터) 포함"""
-    out = [SystemMessage(content=build_system_prompt())]
-    # 선택된 데이터(모달에서 고른 것) → 마지막 user 입력에 컨텍스트로 붙이기
-    selected_block = ""
-    if req.selectedDataTitles:
-        selected_block = "\n\n[선택된 데이터]\n- " + "\n- ".join(req.selectedDataTitles)
 
-    for i, m in enumerate(req.messages):
+def _render_cards(cards: List[AttachedCard]) -> str:
+    """
+    카드 배열을 LLM이 읽기 쉬운 텍스트로 직렬화
+    """
+    blocks: List[str] = []
+    for c in cards:
+        lines = "\n".join([f"- {ln}" for ln in c.lines]) if c.lines else "- (no lines)"
+        blocks.append(f"[CARD] {c.title}\n{lines}")
+    return "\n\n".join(blocks).strip()
+
+
+def to_lc_messages(req: ChatRequest):
+    out = [SystemMessage(content=build_system_prompt())]
+
+    for m in req.messages:
         text = m.content or ""
 
-        # 개별 메시지에 attachedData가 있으면 그것도 붙이기(칩 형태로 보낸 데이터)
+        # ✅ 카드 데이터가 있으면 해당 메시지에 바로 붙임
         if m.attachedData:
-            text += "\n\n[참고 데이터]\n- " + "\n- ".join(m.attachedData)
-
-        # 가장 마지막 user 메시지에만 selected_block을 추가(중복 방지)
-        is_last = (i == len(req.messages) - 1)
-        if is_last and m.role == "user" and selected_block:
-            text += selected_block
+            text += "\n\n" + _render_cards(m.attachedData)
 
         if m.role == "user":
             out.append(HumanMessage(content=text))
@@ -135,15 +134,14 @@ def to_lc_messages(req: ChatRequest):
     return out
 
 
-# ----------- API -----------
-
 @app.get("/health")
 def health():
     return {"ok": True}
 
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    # ✅ 1. 프론트 → 서버로 들어온 원본 메시지 로그
+    # 1) 원본 req 로그
     logger.info(
         "[CHAT][REQ] %s",
         json.dumps(
@@ -151,7 +149,16 @@ def chat(req: ChatRequest):
                 {
                     "role": m.role,
                     "content": _safe_preview(m.content),
-                    "attachedData": m.attachedData,
+                    "attachedData": (
+                        [
+                            {
+                                "title": c.title,
+                                "lines_preview": [_safe_preview(x, 120) for x in (c.lines or [])[:30]]
+                            }
+                            for c in (m.attachedData or [])
+                        ]
+                        if m.attachedData else None
+                    ),
                 }
                 for m in req.messages
             ],
@@ -159,19 +166,21 @@ def chat(req: ChatRequest):
         ),
     )
 
-    # 기존 코드
+    # (선택) DB 조회용 ID가 들어오면 로그로 확인
+    if req.selectedDataIds:
+        logger.info("[CHAT][SELECTED_IDS] %s", req.selectedDataIds)
+
     messages = to_lc_messages(req)
 
-    # ✅ 2. LLM에 실제로 전달되는 메시지 로그 (System 포함)
+
+    # 2) 실제 LLM 입력 로그
+    # 2) 실제 LLM 입력 로그
     logger.info(
         "[CHAT][LC_INPUT] %s",
         json.dumps(
             [
-                {
-                    "type": type(m).__name__,
-                    "content": _safe_preview(m.content),
-                }
-                for m in messages
+                {"type": type(x).__name__, "content": _safe_preview(x.content)}
+                for x in messages
             ],
             ensure_ascii=False,
         ),
@@ -185,7 +194,7 @@ def chat(req: ChatRequest):
 
     resp = llm.invoke(messages)
 
-    # ✅ 3. LLM 응답 로그
+    # 3) 응답 로그
     logger.info("[CHAT][RESP] %s", _safe_preview(resp.content, 800))
 
     return {"answer": str(resp.content).strip()}
