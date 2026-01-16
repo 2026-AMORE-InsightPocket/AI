@@ -49,6 +49,7 @@ FastAPI 기반으로 **대화형 인사이트 생성(Chat)** 과
 ---
 
 ## 📂 Project Structure (핵심 기준)
+```
 AiService
 ├─ .github/
 │   └─ workflows/                 # GitHub Actions (Daily Report 크론)
@@ -71,7 +72,7 @@ AiService
 ├─ settings.py                    # 환경 설정
 ├─ requirements.txt
 └─ README.md
-
+```
 > 사용하지 않거나 실험 중인 파일이 일부 포함되어 있으며,  
 > 기능 안정화 이후 정리 예정입니다.
 
