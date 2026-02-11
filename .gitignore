@@ -120,3 +120,6 @@ fabric.properties
 __pycache__/
 *.pyc
 .DS_Store
+
+
+RAG_HOW_IT_WORKS.md
