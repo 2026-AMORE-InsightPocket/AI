@@ -86,8 +86,8 @@ POST /api/report/custom
 │  (chat_service, report_service)     │
 └──────────────┬──────────────────────┘
                │
-    ┌──────────┼──────────┐
-    │          │          │
+    ┌──────────┼────────┐
+    │          │        │
 ┌───▼───┐  ┌──▼──┐  ┌───▼───┐
 │ Core  │  │Chain│  │Models │
 │ - RAG │  │-Chat│  │Schemas│
