@@ -90,8 +90,8 @@ POST /api/report/custom
     │          │          │
 ┌───▼───┐  ┌──▼──┐  ┌───▼───┐
 │ Core  │  │Chain│  │Models │
-│ - RAG │  │- Chat│  │Schemas│
-│ - VS  │  │- Rpt│  │       │
+│ - RAG │  │-Chat│  │Schemas│
+│ - VS  │  │-Rpt │  │       │
 └───────┘  └─────┘  └───────┘
 ```
 
