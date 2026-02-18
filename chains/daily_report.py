@@ -12,7 +12,7 @@ from db import get_oracle_conn
 import sql as Q
 import settings
 from utils import _to_str, normalize_product_name, md_table
-from rag_store import upsert_report_doc, ingest_doc_to_rag
+from core.vectorstore import VectorStore
 
 
 # =========================
@@ -706,9 +706,10 @@ def save_daily_report(report_day: date, body_md: str, target_hour_kst: int) -> D
         doc_id = doc_id_for_daily(report_day)
         title = f"{report_day.year}년 {report_day.month}월 {report_day.day}일 리포트"
 
+        vs = VectorStore(conn)
+
         # 1) rag_docs 저장(업서트)
-        upsert_report_doc(
-            conn,
+        vs.upsert_document(
             doc_id=doc_id,
             doc_type_id=settings.DOC_TYPE_DAILY,
             title=title,
@@ -717,13 +718,11 @@ def save_daily_report(report_day: date, body_md: str, target_hour_kst: int) -> D
         )
 
         # 2) rag_doc_chunks 저장(기존 삭제 후 재삽입 + embedding)
-        rag_result = ingest_doc_to_rag(
-            conn,
+        rag_result = vs.ingest_document(
             doc_id=doc_id,
             body_md=body_md,
             chunk_max_chars=1200,
             chunk_overlap=120,
-            embedding_model="text-embedding-3-small",
         )
 
         return {"doc_id": doc_id, "chunk_count": rag_result["chunk_count"], "title": title}
