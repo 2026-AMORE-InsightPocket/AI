@@ -5,14 +5,13 @@ Report Service - Business logic for report generation
 from __future__ import annotations
 
 import logging
-from datetime import date
+import uuid
 from typing import Dict, Any
 
 from langchain_core.messages import SystemMessage
 
 from models.schemas import ChatRequest, GenerateReportResponse
 from core.rag import RAGService
-from core.vectorstore import VectorStore
 from chains.custom_report import generate_custom_report_md, infer_title_from_md
 import settings
 
@@ -34,7 +33,6 @@ class ReportService:
         """
         self.conn = conn
         self.rag_service = RAGService(conn)
-        self.vectorstore = VectorStore(conn)
 
     def _keep_last_user_message(self, req: ChatRequest) -> ChatRequest:
         """Keep only the last user message"""
@@ -85,7 +83,7 @@ class ReportService:
 
         Args:
             req: Chat request with user's report request
-            use_rag: Whether to use RAG for similar reports
+            use_rag: Whether to use RAG for daily report context
 
         Returns:
             Generated report response
@@ -122,23 +120,8 @@ class ReportService:
         # Infer title from markdown
         title = infer_title_from_md(body_md, fallback="Custom Report")
 
-        # Generate report ID
-        report_id = VectorStore.new_report_id("report_custom")
-
-        # Save to database
-        self.vectorstore.upsert_document(
-            doc_id=report_id,
-            doc_type_id=settings.DOC_TYPE_CUSTOM,
-            title=title,
-            body_md=body_md,
-            report_date=date.today(),
-        )
-
-        # Ingest to RAG (create embeddings)
-        self.vectorstore.ingest_document(
-            doc_id=report_id,
-            body_md=body_md,
-        )
+        # Generate a simple UUID (no longer saving to RAG)
+        report_id = str(uuid.uuid4())
 
         logger.info(
             f"[REPORT_SERVICE] Custom report generated: "

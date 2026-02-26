@@ -118,27 +118,6 @@ class RAGService:
             top_k=top_k,
         )
 
-    def search_similar_custom_reports(
-        self,
-        query: str,
-        top_k: int = 3,
-    ) -> List[Dict[str, Any]]:
-        """
-        Search for similar custom reports
-
-        Args:
-            query: Search query
-            top_k: Maximum number of results
-
-        Returns:
-            List of similar custom reports
-        """
-        return self.search_relevant_documents(
-            query=query,
-            doc_types=["CUSTOM"],
-            top_k=top_k,
-        )
-
     def build_context_for_chat(
         self,
         user_query: str,
@@ -210,21 +189,21 @@ class RAGService:
         self,
         user_request: str,
         attached_cards: Optional[List[Dict[str, Any]]] = None,
-        use_similar_reports: bool = True,
-        max_similar_reports: int = 2,
+        use_daily_reports: bool = True,
+        max_daily_reports: int = 3,
     ) -> str:
         """
         Build context for custom report generation
 
         Combines:
         1. Attached card data
-        2. Similar past custom reports (for consistency)
+        2. Recent daily reports (for data-driven insights)
 
         Args:
             user_request: User's report request
             attached_cards: List of attached card data
-            use_similar_reports: Whether to include similar past reports
-            max_similar_reports: Maximum number of similar reports to include
+            use_daily_reports: Whether to include recent daily reports
+            max_daily_reports: Maximum number of daily reports to include
 
         Returns:
             Formatted context string for LLM
@@ -245,25 +224,26 @@ class RAGService:
                     "[CURRENT_DATA]\n" + "\n\n".join(card_lines)
                 )
 
-        # 2. Similar past reports (for reference)
-        if use_similar_reports:
-            similar_reports = self.search_similar_custom_reports(
+        # 2. Recent daily reports (for data-driven insights)
+        if use_daily_reports:
+            daily_reports = self.search_recent_daily_reports(
                 query=user_request,
-                top_k=max_similar_reports,
+                top_k=max_daily_reports,
             )
 
-            if similar_reports:
+            if daily_reports:
                 report_lines = []
-                for report in similar_reports:
+                for report in daily_reports:
                     content = report.get("content", "")[:600]
                     title = report.get("title", "")
+                    report_date = report.get("report_date", "")
                     report_lines.append(
-                        f"[REFERENCE_REPORT] {title}\n{content}..."
+                        f"[DAILY_INSIGHT] {title} ({report_date})\n{content}..."
                     )
 
                 if report_lines:
                     context_parts.append(
-                        "[SIMILAR_PAST_REPORTS_FOR_REFERENCE]\n" +
+                        "[RECENT_DAILY_INSIGHTS]\n" +
                         "\n\n".join(report_lines)
                     )
 
